@@ -1,0 +1,8 @@
+my-app/
+├── prisma/
+│   └── schema.prisma
+├── src/
+│   └── index.ts
+├── .env
+├── package.json
+└── tsconfig.json
