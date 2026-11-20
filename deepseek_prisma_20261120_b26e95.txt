@@ -1,0 +1,75 @@
+// schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Dynamic Admin Configuration (e.g., Token Rate)
+model AdminConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// User & Telegram Mapping
+model User {
+  id            String    @id @default(cuid())
+  telegramId    BigInt    @unique
+  username      String?
+  firstName     String?
+  // Balances
+  prxBalance    Decimal   @default(0) @db.Decimal(18, 8)
+  usdBalance    Decimal   @default(0) @db.Decimal(18, 2)
+  // Tier State
+  currentTier   String    @default("NONE") // NONE, S, A, B...
+  tierUnlockedAt DateTime?
+  // Relations
+  claims        Claim[]
+  conversions   Conversion[]
+  createdAt     DateTime  @default(now())
+}
+
+// Tier Definitions (Seed this table)
+model Tier {
+  id            String    @id @default(cuid())
+  name          String    @unique // e.g., "S", "A"
+  unlockCostUsd Decimal   @db.Decimal(10, 2) // e.g., $12.00 for Tier S
+  dailyPrxReward Decimal  @db.Decimal(18, 8)
+  isActive      Boolean   @default(true)
+}
+
+// Strict 24-Hour Claim Log
+model Claim {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tierName  String
+  amountPrx Decimal  @db.Decimal(18, 8)
+  claimedAt DateTime @default(now())
+  
+  // Index for fast cooldown lookups
+  @@index([userId, tierName, claimedAt])
+}
+
+// Conversion Log (PRX -> USD)
+model Conversion {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  prxAmount     Decimal  @db.Decimal(18, 8)
+  usdAmount     Decimal  @db.Decimal(18, 2)
+  rateUsed      Decimal  @db.Decimal(10, 4)
+  convertedAt   DateTime @default(now())
+}
+
+// Idempotency Keys for Critical Endpoints (Claim/Convert)
+model IdempotencyKey {
+  key       String   @id
+  userId    String
+  response  Json?
+  createdAt DateTime @default(now())
+}
